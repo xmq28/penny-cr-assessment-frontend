@@ -5,7 +5,7 @@ import { CrApiService } from '../../api/cr-api.service';
 import { users } from '../../api/fixtures';
 import { ReqUser } from '../../models/cr.models';
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+const flush = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 async function render(user: ReqUser, id: string): Promise<ComponentFixture<CrDetailComponent>> {
 	TestBed.configureTestingModule({
@@ -167,6 +167,23 @@ describe('CrDetailComponent', () => {
 		expect(fixture.nativeElement.querySelector('.cr-actions__error').textContent).toContain('Network error');
 		expect(fixture.nativeElement.querySelector('.cr-status').textContent).toContain('PENDING_APPROVAL');
 		expect((await api.getChangeRequest(users.approver, 'CR-1')).status).toBe('PENDING_APPROVAL');
+	});
+
+	it('shows an approval error and preserves status when another API call is already in flight', async () => {
+		const fixture = await render(users.approver, 'CR-1');
+		const api = TestBed.inject(CrApiService);
+		api.latencyMs = 20;
+		const pendingList = api.listChangeRequests(users.approver).catch(() => null);
+		api.failNext = true;
+
+		(fixture.nativeElement.querySelector('.cr-actions__approve') as HTMLButtonElement).click();
+		await flush(30);
+		fixture.detectChanges();
+
+		expect(await pendingList).toHaveLength(3);
+		expect(fixture.nativeElement.querySelector('.cr-actions__error').textContent).toContain('Network error');
+		expect(fixture.nativeElement.querySelector('.cr-status').textContent).toContain('PENDING_APPROVAL');
+		expect(fixture.componentInstance.detail?.status).toBe('PENDING_APPROVAL');
 	});
 
 	it('blocks rejection until the reason contains non-whitespace text', async () => {

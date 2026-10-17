@@ -20,10 +20,11 @@ export class CrApiService {
 	failNext = false;
 
 	private settle<T>(value: T): Promise<T> {
+		const shouldFail = this.failNext;
+		this.failNext = false;
 		return new Promise<T>((resolve, reject) => {
 			setTimeout(() => {
-				if (this.failNext) {
-					this.failNext = false;
+				if (shouldFail) {
 					reject(new Error('Network error'));
 					return;
 				}
@@ -33,7 +34,11 @@ export class CrApiService {
 	}
 
 	private fail<T>(message: string): Promise<T> {
-		return new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), this.latencyMs));
+		const shouldFail = this.failNext;
+		this.failNext = false;
+		return new Promise<T>((_, reject) =>
+			setTimeout(() => reject(new Error(shouldFail ? 'Network error' : message)), this.latencyMs),
+		);
 	}
 
 	listChangeRequests(user: ReqUser): Promise<CrSummary[]> {
