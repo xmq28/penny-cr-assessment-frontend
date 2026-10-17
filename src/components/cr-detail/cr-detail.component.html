@@ -1,71 +1,144 @@
-<section class="cr-detail">
-	<p *ngIf="state.status === 'loading'" class="cr-detail__loading" role="status">Loading change request…</p>
+<section class="cr-detail card">
+	<div *ngIf="state.status === 'loading'" class="cr-detail__loading" role="status" aria-label="Loading change request">
+		<p class="cr-detail__loading-text">Loading request details…</p>
+		<div class="skeleton cr-detail__skeleton-title"></div>
+		<div class="cr-detail__skeleton-stats">
+			<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+		</div>
+		<div class="skeleton cr-detail__skeleton-block"></div>
+	</div>
 
 	<div *ngIf="state.status === 'error'" class="cr-detail__error" role="alert">
-		<p>Couldn't load this change request: {{ state.error }}</p>
-		<button type="button" (click)="load()">Retry</button>
+		<div class="state state--error">
+			<span class="state__icon" aria-hidden="true"><svg class="icon"><use href="#i-alert"></use></svg></span>
+			<h2 class="state__title">Request couldn't load</h2>
+			<p class="state__text">{{ state.error }}. No action was taken.</p>
+			<button class="btn btn--secondary" type="button" (click)="load()"><svg class="icon"><use href="#i-refresh"></use></svg>Try again</button>
+		</div>
 	</div>
 
 	<ng-container *ngIf="state.status === 'loaded' && detail as cr">
 		<header class="cr-detail__header">
-			<h2>{{ cr.title }}</h2>
+			<div>
+				<p class="cr-detail__eyebrow"><span class="mono">{{ cr.id }}</span> · Agreement <span class="mono">{{ cr.agreementId }}</span></p>
+				<h2>{{ cr.title }}</h2>
+				<p class="cr-detail__meta">Updated {{ cr.updatedAt | date: 'MMM d, y, h:mm a' }}</p>
+			</div>
 			<span class="cr-status" [attr.data-status]="cr.status">{{ cr.status }}</span>
-			<p class="cr-detail__totals">
-				{{ fmt(cr.baselineTotal) }} → {{ fmt(cr.newTotal) }}
-				<strong class="cr-detail__delta">(Δ {{ fmt(cr.delta) }})</strong>
-			</p>
 		</header>
+		<dl class="cr-detail__totals" aria-label="Agreement value summary">
+			<div class="cr-stat">
+				<dt>Current total</dt>
+				<dd>{{ fmt(cr.baselineTotal) }}</dd>
+			</div>
+			<div class="cr-stat">
+				<dt>Proposed total</dt>
+				<dd>{{ fmt(cr.newTotal) }}</dd>
+			</div>
+			<div class="cr-stat cr-stat--delta" [attr.data-tone]="deltaTone(cr.delta)">
+				<dt>Net change</dt>
+				<dd class="cr-detail__delta"><svg class="icon" aria-hidden="true"><use [attr.href]="deltaIcon(cr.delta)"></use></svg>{{ fmt(cr.delta) }}</dd>
+			</div>
+		</dl>
 
-		<!-- Diff / preview panel -->
+		<div *ngIf="actionError" class="banner banner--error cr-detail__notice cr-actions__error" role="alert">
+			<svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+			<p>{{ actionError }} The request is still {{ cr.status.toLowerCase().replace('_', ' ') }}.</p>
+		</div>
+
 		<section class="cr-diff">
-			<h3>Proposed changes</h3>
-			<table class="cr-diff__table">
-				<thead>
-					<tr><th>SKU</th><th>Change</th><th>Before</th><th>After</th></tr>
-				</thead>
-				<tbody>
-					<tr *ngFor="let row of diff" class="cr-diff__row" [attr.data-kind]="row.kind">
-						<td>{{ row.sku }}</td>
-						<td class="cr-diff__kind">{{ row.kind }}</td>
-						<td>{{ row.baseline ? row.baseline.quantity + ' × ' + fmt(row.baseline.unitPrice) : '—' }}</td>
-						<td>{{ row.proposed ? row.proposed.quantity + ' × ' + fmt(row.proposed.unitPrice) : '—' }}</td>
-					</tr>
-				</tbody>
-			</table>
+			<div class="cr-section-head">
+				<h3>Line item changes</h3>
+				<p>Baseline compared with proposed terms</p>
+			</div>
+			<div class="cr-table-scroll">
+				<table class="cr-diff__table" aria-label="Before and after line item comparison">
+					<thead>
+						<tr><th>SKU</th><th>Change</th><th>Before</th><th>After</th></tr>
+					</thead>
+					<tbody>
+						<tr *ngFor="let row of diff" class="cr-diff__row" [attr.data-kind]="row.kind">
+							<th scope="row">{{ row.sku }}</th>
+							<td><span class="cr-diff__kind" [attr.data-kind]="row.kind">{{ row.kind }}</span></td>
+							<td class="cr-diff__cell--before" data-label="Before">
+								<ng-container *ngIf="row.baseline; else noBaseline">
+									<span class="cr-diff__line" [class.is-changed]="isQuantityChanged(row) || isUnitPriceChanged(row)">{{ row.baseline.quantity }} × {{ fmt(row.baseline.unitPrice) }}</span>
+									<span class="cr-diff__desc" [class.is-changed]="isDescriptionChanged(row)">{{ row.baseline.description }}</span>
+								</ng-container>
+								<ng-template #noBaseline><span class="cr-diff__empty">—</span></ng-template>
+							</td>
+							<td class="cr-diff__cell--after" data-label="After">
+								<ng-container *ngIf="row.proposed; else noProposal">
+									<span class="cr-diff__line" [class.is-changed]="isQuantityChanged(row) || isUnitPriceChanged(row)">{{ row.proposed.quantity }} × {{ fmt(row.proposed.unitPrice) }}</span>
+									<span class="cr-diff__desc" [class.is-changed]="isDescriptionChanged(row)">{{ row.proposed.description }}</span>
+								</ng-container>
+								<ng-template #noProposal><span class="cr-diff__empty">—</span></ng-template>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
 		</section>
 
-		<!-- Approval timeline -->
 		<section class="cr-timeline">
-			<h3>Timeline</h3>
+			<div class="cr-section-head">
+				<h3>Approval history</h3>
+				<p>Oldest activity first</p>
+			</div>
 			<ol class="cr-timeline__list">
-				<li *ngFor="let entry of timeline" class="cr-timeline__entry">
-					<span class="cr-timeline__action">{{ entry.action }}</span>
-					<span class="cr-timeline__by">{{ entry.byUserId }}</span>
-					<span class="cr-timeline__at">{{ entry.at }}</span>
-					<span *ngIf="entry.note" class="cr-timeline__note">{{ entry.note }}</span>
+				<li *ngFor="let entry of timeline" class="cr-timeline__entry" [attr.data-action]="entry.action">
+					<span class="cr-timeline__marker" aria-hidden="true"></span>
+					<div>
+						<div class="cr-timeline__head">
+							<span class="cr-timeline__action">{{ timelineAction(entry.action) }}</span>
+							<span class="cr-timeline__by"><span class="avatar" aria-hidden="true">{{ entry.byUserId.slice(0, 1).toUpperCase() }}</span>{{ entry.byUserId }}</span>
+							<time class="cr-timeline__at mono" [attr.datetime]="entry.at">{{ entry.at }}</time>
+						</div>
+						<p *ngIf="entry.note" class="cr-timeline__note">{{ entry.note }}</p>
+					</div>
 				</li>
 			</ol>
 		</section>
 
-		<!-- Actions -->
-		<section class="cr-actions">
-			<p *ngIf="actionError" class="cr-actions__error" role="alert">{{ actionError }}</p>
+		<div *ngIf="!canApprove && !canReject && cr.status === 'PENDING_APPROVAL'" class="banner banner--info cr-detail__notice">
+			<svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+			<p>Read-only view. Your current role does not include approval access for this request.</p>
+		</div>
 
-			<button type="button" class="cr-actions__approve" [disabled]="!canApprove || submitting" (click)="approve()">
-				Approve
-			</button>
-
-			<div class="cr-actions__reject" *ngIf="canReject">
-				<label>
-					Reason for rejection
-					<textarea class="cr-actions__reason" [formControl]="rejectControl"></textarea>
-				</label>
-				<p *ngIf="rejectControl.invalid && rejectControl.touched" class="cr-actions__reason-error" role="alert">
-					Please enter a reason.
-				</p>
-				<button type="button" class="cr-actions__reject-btn" [disabled]="!canReject || submitting || rejectControl.invalid" (click)="reject()">
-					Reject
-				</button>
+		<section class="cr-actions" *ngIf="canApprove || canReject" aria-labelledby="decision-title">
+			<div class="cr-section-head">
+				<h3 id="decision-title">Your decision</h3>
+				<p>Actions are recorded in this request's approval history.</p>
+			</div>
+			<div class="cr-actions__body">
+				<div class="cr-actions__panel">
+					<div>
+						<h4>Approve request</h4>
+						<p>Confirm these proposed changes to the agreement.</p>
+					</div>
+					<button *ngIf="canApprove" type="button" class="btn btn--primary cr-actions__approve" [disabled]="submitting" [attr.aria-busy]="submitting" (click)="approve()">
+						<span *ngIf="submitting" class="spinner" aria-hidden="true"></span>
+						<svg *ngIf="!submitting" class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+						{{ submitting ? 'Approving…' : 'Approve change request' }}
+					</button>
+				</div>
+				<div class="cr-actions__panel cr-actions__reject">
+					<div>
+						<h4>Reject request</h4>
+						<p>A reason is required and will be added to the approval history.</p>
+					</div>
+					<label for="reject-reason" class="field-label">Reason for rejection <span aria-hidden="true">*</span></label>
+					<textarea id="reject-reason" class="textarea cr-actions__reason" [formControl]="rejectControl" [readonly]="submitting" [attr.aria-invalid]="rejectControl.invalid && rejectControl.touched" aria-describedby="reject-reason-hint reject-reason-error" placeholder="Add context for the requester…"></textarea>
+					<p id="reject-reason-hint" class="field-hint">Keep the reason concise and specific.</p>
+					<p id="reject-reason-error" *ngIf="rejectControl.invalid && rejectControl.touched" class="field-error cr-actions__reason-error" role="alert">
+						Please enter a reason.
+					</p>
+					<button type="button" class="btn btn--danger cr-actions__reject-btn" [disabled]="submitting || rejectControl.invalid" [attr.aria-busy]="submitting" (click)="reject()">
+						<span *ngIf="submitting" class="spinner" aria-hidden="true"></span>
+						<svg *ngIf="!submitting" class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+						{{ submitting ? 'Submitting…' : 'Reject change request' }}
+					</button>
+				</div>
 			</div>
 		</section>
 	</ng-container>

@@ -1,39 +1,83 @@
-<section class="cr-list">
+<section class="cr-list card">
 	<header class="cr-list__header">
-		<h2>Change Requests</h2>
-		<label>
-			Status
-			<select class="cr-list__filter" [value]="statusFilter" (change)="onFilterChange($any($event.target).value)">
-				<option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
-			</select>
-		</label>
+		<div class="cr-list__title-row">
+			<h2>Requests</h2>
+			<span class="cr-list__count" *ngIf="state.status === 'loaded'">{{ visibleCount }} of {{ state.data?.length || 0 }}</span>
+		</div>
+		<div class="cr-list__controls">
+			<label class="cr-list__search-wrap">
+				<span class="sr-only">Search requests</span>
+				<svg class="icon cr-list__search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+				<input class="input cr-list__search" type="search" placeholder="Search requests" [value]="searchTerm" (input)="setSearchTerm($any($event.target).value)" />
+			</label>
+			<label>
+				<span class="sr-only">Filter by status</span>
+				<select class="select cr-list__filter" [value]="statusFilter" (change)="onFilterChange($any($event.target).value)">
+					<option *ngFor="let s of statuses" [value]="s">{{ s === 'ALL' ? 'All statuses' : statusLabel(s) }}</option>
+				</select>
+			</label>
+		</div>
 	</header>
 
-	<p *ngIf="state.status === 'loading'" class="cr-list__loading" role="status">Loading change requests…</p>
-
-	<div *ngIf="state.status === 'error'" class="cr-list__error" role="alert">
-		<p>Couldn't load change requests: {{ state.error }}</p>
-		<button type="button" (click)="load()">Retry</button>
+	<div *ngIf="state.status === 'loading'" class="cr-list__loading" role="status" aria-label="Loading change requests">
+		<p class="cr-list__loading-text">Loading requests…</p>
+		<div class="skeleton cr-list__skeleton"></div>
+		<div class="skeleton cr-list__skeleton"></div>
+		<div class="skeleton cr-list__skeleton"></div>
 	</div>
 
-	<p *ngIf="state.status === 'empty'" class="cr-list__empty">No change requests to show.</p>
+	<div *ngIf="state.status === 'error'" class="cr-list__error" role="alert">
+		<div class="state state--error">
+			<span class="state__icon" aria-hidden="true"><svg class="icon"><use href="#i-alert"></use></svg></span>
+			<h3 class="state__title">Requests couldn't load</h3>
+			<p class="state__text">{{ state.error }}. Your requests are unchanged.</p>
+			<button class="btn btn--secondary" type="button" (click)="load()"><svg class="icon"><use href="#i-refresh"></use></svg>Try again</button>
+		</div>
+	</div>
 
-	<table *ngIf="state.status === 'loaded'" class="cr-list__table">
-		<thead>
-			<tr>
-				<th>ID</th>
-				<th>Title</th>
-				<th>Status</th>
-				<th>Delta</th>
-			</tr>
-		</thead>
-		<tbody>
-			<tr *ngFor="let cr of visibleRows" class="cr-list__row" (click)="select.emit(cr.id)">
-				<td>{{ cr.id }}</td>
-				<td>{{ cr.title }}</td>
-				<td><span class="cr-status" [attr.data-status]="cr.status">{{ cr.status }}</span></td>
-				<td>{{ cr.delta }}</td>
-			</tr>
-		</tbody>
-	</table>
+	<div *ngIf="state.status === 'empty'" class="state cr-list__empty">
+		<span class="state__icon" aria-hidden="true"><svg class="icon"><use href="#i-inbox"></use></svg></span>
+		<h3 class="state__title">No change requests yet</h3>
+		<p class="state__text">Requests for this organization will appear here when available.</p>
+	</div>
+	<div *ngIf="state.status === 'loaded' && visibleRows.length === 0" class="state cr-list__no-results" role="status">
+		<span class="state__icon" aria-hidden="true"><svg class="icon"><use href="#i-search"></use></svg></span>
+		<h3 class="state__title">No matching requests</h3>
+		<p class="state__text">No change requests match the selected status or search.</p>
+		<button class="btn btn--ghost" type="button" (click)="clearFilters()">Clear filters</button>
+	</div>
+
+	<div *ngIf="state.status === 'loaded' && visibleRows.length > 0" class="cr-table-scroll">
+		<table class="cr-list__table" aria-label="Change requests">
+			<thead>
+				<tr>
+					<th scope="col">Request</th>
+					<th scope="col">Status</th>
+					<th scope="col">Net impact</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr
+					*ngFor="let cr of visibleRows"
+					class="cr-list__row"
+					[class.is-selected]="cr.id === selectedId"
+					[attr.aria-selected]="cr.id === selectedId"
+					[attr.tabindex]="0"
+					[attr.aria-label]="cr.id + ': ' + cr.title + ', ' + statusLabel(cr.status)"
+					(click)="selectRow(cr.id)"
+					(keydown)="selectRowOnKey($event, cr.id)"
+				>
+					<td>
+						<div class="cr-list__cell-main">
+							<span class="cr-list__id mono">{{ cr.id }}</span>
+							<span class="cr-list__title">{{ cr.title }}</span>
+							<span class="cr-list__updated">Updated {{ cr.updatedAt | date: 'MMM d, y' }}</span>
+						</div>
+					</td>
+					<td><span class="cr-status cr-list__status" [attr.data-status]="cr.status">{{ statusLabel(cr.status) }}</span></td>
+					<td><span class="cr-delta" [attr.data-tone]="deltaTone(cr)">{{ deltaLabel(cr) }}</span></td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
 </section>

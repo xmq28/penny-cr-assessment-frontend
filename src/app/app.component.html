@@ -1,14 +1,46 @@
 <header class="app-header">
-	<h1>Change Request Review</h1>
-	<label>
-		Acting as:
-		<select (change)="switchUser($any($event.target).value)">
-			<option *ngFor="let key of userKeys" [value]="key" [selected]="session.user.id === users[key]?.id">{{ key }}</option>
-		</select>
-	</label>
+	<div class="app-header__inner">
+		<div class="app-brand">
+			<span class="app-brand__mark" aria-hidden="true">
+				<svg class="icon"><use href="#i-logo"></use></svg>
+			</span>
+			<div>
+				<p class="app-brand__name">Penny</p>
+				<p class="app-brand__eyebrow">Procurement workspace</p>
+			</div>
+		</div>
+		<div class="app-user">
+			<span class="avatar app-user__avatar" aria-hidden="true">{{ session.user.id.slice(0, 1).toUpperCase() }}</span>
+			<label class="app-user__picker">
+				<span class="app-user__label">Acting as</span>
+				<select class="select app-user__select" aria-label="Acting as" (change)="switchUser($any($event.target).value)">
+					<option *ngFor="let key of userKeys" [value]="key" [selected]="session.user.id === users[key]?.id">{{ key }}</option>
+				</select>
+			</label>
+		</div>
+	</div>
 </header>
 
-<main class="app-layout" *ngIf="show">
-	<app-cr-list (select)="onSelect($event)"></app-cr-list>
-	<app-cr-detail *ngIf="selectedId" [id]="selectedId"></app-cr-detail>
+<main class="app-page" *ngIf="show">
+	<header class="app-page__head">
+		<div>
+			<h1 class="app-page__title">Change requests</h1>
+			<p class="app-page__subtitle">Review proposed agreement changes and their approval history.</p>
+		</div>
+		<div class="app-page__context" aria-label="Workspace context">
+			<span class="chip chip--accent">{{ session.user.orgCode }}</span>
+			<span class="chip">Reviewer workspace</span>
+		</div>
+	</header>
+	<div class="app-layout">
+		<app-cr-list [selectedId]="selectedId" [refreshToken]="listRefreshToken" (select)="onSelect($event)"></app-cr-list>
+		<app-cr-detail *ngIf="selectedId; else chooseRequest" [id]="selectedId" (actionSucceeded)="onActionSucceeded()"></app-cr-detail>
+		<ng-template #chooseRequest>
+			<section class="card state app-placeholder" aria-label="No request selected">
+				<span class="state__icon" aria-hidden="true"><svg class="icon"><use href="#i-file"></use></svg></span>
+				<h2 class="state__title">Select a change request</h2>
+				<p class="state__text">Choose a request from the list to review its proposed changes and approval history.</p>
+			</section>
+		</ng-template>
+	</div>
 </main>

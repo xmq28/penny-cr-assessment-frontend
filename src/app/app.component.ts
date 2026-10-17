@@ -22,17 +22,23 @@ export class AppComponent {
 	readonly users = users;
 	readonly userKeys = Object.keys(users);
 	selectedId: string | null = 'CR-1';
+	listRefreshToken = 0;
 	show = true;
 
 	constructor(public readonly session: SessionService) {}
 
 	switchUser(key: string): void {
 		this.session.user = users[key];
+		this.selectedId = null;
 		this.reload();
 	}
 
 	onSelect(id: string): void {
 		this.selectedId = id;
+	}
+
+	onActionSucceeded(): void {
+		this.listRefreshToken += 1;
 	}
 
 	/** Destroy + recreate the panes so they re-load as the newly selected user. */
