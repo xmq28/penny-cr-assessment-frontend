@@ -1,7 +1,10 @@
 /* Change request detail */
 
 .cr-detail {
-	overflow: hidden;
+	height: 100%;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
 	container-type: inline-size;
 }
 
